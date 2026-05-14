@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  MASTER
+  MANAGER
+}
+
+model Org {
+  id               String            @id @default(cuid())
+  name             String
+  settings         Json?
+  createdAt        DateTime          @default(now())
+  users            User[]
+  debtors          Debtor[]
+  messageTemplates MessageTemplate[]
+}
+
+model User {
+  id           String     @id @default(cuid())
+  orgId        String
+  org          Org        @relation(fields: [orgId], references: [id])
+  name         String
+  email        String?    @unique
+  phone        String?    @unique
+  passwordHash String
+  role         Role
+  status       String     @default("active")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  auditLogs    AuditLog[] @relation("AuditActor")
+}
+
+model Debtor {
+  id          String    @id @default(cuid())
+  orgId       String
+  org         Org       @relation(fields: [orgId], references: [id])
+  name        String
+  phone       String?
+  notes       String?
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  debts       Debt[]
+  reminders   Reminder[]
+  smsLogs     SmsLog[]
+}
+
+model Debt {
+  id          String    @id @default(cuid())
+  debtorId    String
+  debtor      Debtor    @relation(fields: [debtorId], references: [id])
+  principal   Decimal   @db.Decimal(14, 2)
+  dueDate     DateTime?
+  status      String    @default("open") // open | partial | closed
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  payments    Payment[]
+}
+
+model Payment {
+  id          String    @id @default(cuid())
+  debtId      String
+  debt        Debt      @relation(fields: [debtId], references: [id])
+  amount      Decimal   @db.Decimal(14, 2)
+  paidAt      DateTime
+  method      String    @default("cash")
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+}
+
+model DailySummary {
+  id          String    @id @default(cuid())
+  orgId       String
+  org         Org       @relation(fields: [orgId], references: [id])
+  date        DateTime
+  totalIn     Decimal   @db.Decimal(14, 2)
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+}
+
+model Reminder {
+  id           String            @id @default(cuid())
+  debtorId     String
+  debtor       Debtor            @relation(fields: [debtorId], references: [id])
+  templateId   String?
+  template     MessageTemplate?  @relation(fields: [templateId], references: [id])
+  scheduledFor DateTime?
+  sentAt       DateTime?
+  status       String            @default("pending") // pending | sent | failed
+  channel      String            @default("sms")
+  createdById  String
+  createdBy    User              @relation(fields: [createdById], references: [id])
+  createdAt    DateTime          @default(now())
+  smsLogs      SmsLog[]
+}
+
+model SmsLog {
+  id         String    @id @default(cuid())
+  debtorId   String
+  debtor     Debtor    @relation(fields: [debtorId], references: [id])
+  reminderId String?
+  reminder   Reminder? @relation(fields: [reminderId], references: [id])
+  toNumber   String
+  body       String
+  status     String    @default("queued") // queued | sent | failed
+  providerId String?
+  error      String?
+  createdAt  DateTime  @default(now())
+}
+
+model MessageTemplate {
+  id        String    @id @default(cuid())
+  orgId     String
+  org       Org       @relation(fields: [orgId], references: [id])
+  name      String
+  body      String
+  createdAt DateTime  @default(now())
+  reminders Reminder[]
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String
+  actor       User     @relation("AuditActor", fields: [actorUserId], references: [id])
+  action      String
+  entityType  String
+  entityId    String
+  before      Json?
+  after       Json?
+  createdAt   DateTime @default(now())
+}
