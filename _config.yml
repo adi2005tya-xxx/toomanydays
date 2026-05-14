@@ -1,0 +1,7 @@
+exclude:
+  - node_modules
+  - .git
+  - .gitignore
+  - README.md
+  - api/node_modules
+  - web/node_modules
